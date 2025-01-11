@@ -2,7 +2,9 @@ const puppeteer = require('puppeteer-core');
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const path = require('path');
 
+// Retry logic for actions with multiple attempts
 async function retryAction(action, retries = 3, delay = 2000) {
     let lastError;
     for (let attempt = 1; attempt <= retries; attempt++) {
@@ -19,11 +21,10 @@ async function retryAction(action, retries = 3, delay = 2000) {
     throw lastError;
 }
 
+// Function to search and download movie
 async function searchAndDownloadMovie(movieName) {
-    const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-
     const browser = await puppeteer.launch({
-        executablePath: chromePath,
+        executablePath: process.env.CHROME_BIN || '/usr/bin/google-chrome-stable', // Use Chromium on Render
         headless: true,
         args: [
             '--no-sandbox',
@@ -133,8 +134,7 @@ async function searchAndDownloadMovie(movieName) {
         throw error;
     } finally {
         console.log("Leaving browser open for debugging...");
-        // Keep the browser open for 1 hour (3600000 ms)
-        await new Promise(resolve => setTimeout(resolve, 3600000));
+        await new Promise(resolve => setTimeout(resolve, 3600000)); // Keep browser open for 1 hour
 
         if (browser && browser.isConnected()) {
             await browser.close();
@@ -142,9 +142,13 @@ async function searchAndDownloadMovie(movieName) {
     }
 }
 
+// Create Express app
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+
+// Serve static frontend files from the 'public' folder
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.post('/download', async (req, res) => {
     const { movieTitle } = req.body;
@@ -165,10 +169,8 @@ app.post('/download', async (req, res) => {
     }
 });
 
+// Listen on the assigned port or fallback to 3000
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
-
-// Example usage (uncomment to test)
-// searchAndDownloadMovie('Inception').then(console.log).catch(console.error);
